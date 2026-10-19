@@ -19,7 +19,8 @@ r.post('/register', limiter, validate(z.object({ name: z.string().trim().min(2).
   res.status(201).json({ message: 'Account created. An admin must approve it before you can sign in.' })
 }))
 r.post('/login', limiter, validate(z.object({ email, password: z.string().min(1).max(72) })), asyncHandler(async (req, res) => {
-  const user = await User.findOne({ email: req.body.email }).select('+passwordHash'), ok = await bcrypt.compare(req.body.password, user?.passwordHash ?? DUMMY)
+  const user = await User.findOne({ email: req.body.email }).select('+passwordHash')
+  const ok = await bcrypt.compare(req.body.password, user?.passwordHash ?? DUMMY)
   if (!user || !ok) throw new AppError(401, 'Wrong email or password')
   if (!user.approved) throw new AppError(403, 'Your account is waiting for admin approval')
   const token = jwt.sign({ sub: String(user._id) }, env.JWT_SECRET, { expiresIn: `${env.SESSION_HOURS}h` })
