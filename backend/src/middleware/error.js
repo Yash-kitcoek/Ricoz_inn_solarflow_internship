@@ -8,5 +8,5 @@ export function errorHandler(err, req, res, next) { // eslint-disable-line no-un
   if (err.name === 'ValidationError') return res.status(400).json({ error: 'Validation failed', details: Object.values(err.errors).map(e => ({ path: e.path, message: e.message })) })
   if (err.code === 11000) return res.status(409).json({ error: 'That value already exists' })
   if (err.name === 'MulterError') return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'File is larger than 8 MB' : err.message })
-  console.error(err); res.status(500).json({ error: env.NODE_ENV === 'production' ? 'Something went wrong' : err.message })
+  console.error(err); res.status(500).json({ error: 'Something went wrong', details: [{ message: err.message }] })
 }
