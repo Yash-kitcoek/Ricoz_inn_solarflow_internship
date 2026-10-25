@@ -2,10 +2,12 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import { useLoad } from '@/lib/hooks'
+import { usePolling } from '@/lib/usePolling'
 import { ErrorText, PageHeader, Empty, Loading } from '@/components/ui'
 const STATUSES = ['Not Started', 'Documents Required', 'Ready to Submit', 'Submitted', 'Under Review', 'Inspection Scheduled', 'Approved', 'Rejected', 'Connected to Grid']
 export default function NetMetering() {
   const { data, error, loading, reload } = useLoad(async () => { const [a, b] = await Promise.all([api('/net-metering'), api('/projects')]); return { ...a, projects: b.projects } }), [err, setErr] = useState(null)
+  usePolling(reload)
   async function add(e) { e.preventDefault(); const form = e.currentTarget; setErr(null); try { await api('/net-metering', { method: 'POST', body: Object.fromEntries(new FormData(form)) }); form.reset(); reload() } catch (x) { setErr(x.message) } }
   async function setStatus(a, status) { try { setErr(null); await api(`/net-metering/${a._id}/status`, { method: 'PATCH', body: { status } }); reload() } catch (x) { setErr(x.message) } }
   if (loading) return <Loading />

@@ -12,7 +12,8 @@ import { looksLikeImage } from '../utils/image.js'
 import { accessibleProjectIds, assertProject, scopeFilter } from '../services/access.js'
 import { KINDS, MS_STATUSES, checkTransition, missingEvidence } from '../services/milestoneRules.js'
 import { AppError, asyncHandler } from '../utils/AppError.js'
-const r = Router(); r.use(authenticate)
+import { notifyProjectCustomer } from '../services/customerNotifications.js'
+const r = Router(); r.use(authenticate, authorize('project_manager', 'engineer', 'contractor', 'finance'))
 const dto = m => ({ id: m._id, project: m.project, contractor: m.contractor, description: m.description, amount: m.amount, dueDate: m.dueDate, status: m.status, requiredEvidence: m.requiredEvidence,
   evidence: m.evidence.map(e => ({ id: e._id, kind: e.kind, lat: e.lat, lng: e.lng, takenAt: e.takenAt, hasLocation: Number.isFinite(e.lat) && Number.isFinite(e.lng) })), missingEvidence: missingEvidence(m),
   invoice: m.invoice?.number ? { number: m.invoice.number, date: m.invoice.date } : null, approvalNotes: m.approvalNotes, payment: m.payment?.reference ? { paidOn: m.payment.paidOn, reference: m.payment.reference } : null })
@@ -31,7 +32,9 @@ r.get('/', validate(z.object({ project: oid.optional(), status: z.enum(MS_STATUS
   res.json({ milestones: (await populated(Milestone.find(f).sort({ createdAt: -1 }))).map(dto) })
 }))
 r.post('/', authorize('admin', 'project_manager'), validate(z.object({ project: oid, contractor: oid, description: z.string().trim().min(2).max(200), amount: z.coerce.number().min(1), dueDate: z.coerce.date().optional(), requiredEvidence: z.array(z.enum(KINDS)).min(1).optional() })), asyncHandler(async (req, res) => {
-  await assertProject(req.user, req.body.project); const m = await Milestone.create(req.body); await record(req.user, m.project, 'created milestone', m.description); res.status(201).json({ milestone: dto(m) })
+  await assertProject(req.user, req.body.project); const m = await Milestone.create(req.body); await record(req.user, m.project, 'created milestone', m.description)
+  await notifyProjectCustomer(m.project, { title: 'Milestone update', message: `A project milestone was added: ${m.description}.`, dedupeKey: `milestone:${m._id}:created` })
+  res.status(201).json({ milestone: dto(m) })
 }))
 // Authorisation first, then the upload, so rejected users never write a file
 const canAddEvidence = asyncHandler(async (req, res, next) => {
@@ -65,11 +68,15 @@ r.post('/:id/transition', validate(idParams, 'params'), validate(z.object({ to: 
   const set = { status: to }; if (to === 'pending_approval') set.verifiedBy = req.user._id; if (to === 'approved_for_payment') set.approvedBy = req.user._id; if (to === 'disputed') set.approvalNotes = notes
   const u = await Milestone.findOneAndUpdate({ _id: m._id, status: m.status }, set, { new: true })     // fails if someone else moved it first
   if (!u) throw new AppError(409, 'This milestone was just changed by someone else. Reload and try again.')
-  await record(req.user, u.project, `milestone ${to.replace(/_/g, ' ')}`, u.description); res.json({ milestone: dto(u) })
+  await record(req.user, u.project, `milestone ${to.replace(/_/g, ' ')}`, u.description)
+  await notifyProjectCustomer(u.project, { title: 'Milestone update', message: `Milestone "${u.description}" is now ${to.replace(/_/g, ' ')}.`, dedupeKey: `milestone:${u._id}:${u.updatedAt.getTime()}` })
+  res.json({ milestone: dto(u) })
 }))
 r.post('/:id/pay', authorize('admin', 'finance'), validate(idParams, 'params'), validate(z.object({ reference: z.string().trim().min(3).max(100), paidOn: z.coerce.date().optional() })), asyncHandler(async (req, res) => {
   const m = await load(req); if (m.status !== 'approved_for_payment') throw new AppError(409, 'Only milestones approved for payment can be recorded as paid')
   const u = await Milestone.findOneAndUpdate({ _id: m._id, status: 'approved_for_payment' }, { status: 'paid', payment: { reference: req.body.reference, paidOn: req.body.paidOn ?? new Date(), recordedBy: req.user._id } }, { new: true })
-  if (!u) throw new AppError(409, 'This milestone was just changed by someone else.'); await record(req.user, u.project, 'recorded payment', `${u.description}: ref ${req.body.reference}`); res.json({ milestone: dto(u) })
+  if (!u) throw new AppError(409, 'This milestone was just changed by someone else.'); await record(req.user, u.project, 'recorded payment', `${u.description}: ref ${req.body.reference}`)
+  await notifyProjectCustomer(u.project, { title: 'Milestone update', message: `Milestone "${u.description}" has been marked paid.`, dedupeKey: `milestone:${u._id}:${u.updatedAt.getTime()}` })
+  res.json({ milestone: dto(u) })
 }))
 export default r

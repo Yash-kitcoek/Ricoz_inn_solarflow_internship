@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError.js'
 // null means "all projects". Otherwise a list of project ids this user may see.
 export async function accessibleProjectIds(user) {
   if (user.role === 'admin' || user.role === 'finance') return null
+  if (user.role === 'customer') return Project.find({ customerAccount: user._id, archived: false }).distinct('_id')
   if (user.role === 'contractor') return user.contractor ? Milestone.find({ contractor: user.contractor }).distinct('project') : []
   return Project.find({ $or: [{ projectManager: user._id }, { engineer: user._id }] }).distinct('_id')
 }

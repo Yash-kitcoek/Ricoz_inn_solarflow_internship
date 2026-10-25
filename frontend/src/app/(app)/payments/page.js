@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import { useLoad } from '@/lib/hooks'
+import { usePolling } from '@/lib/usePolling'
 import { useAuth } from '@/lib/auth'
 import { money, day } from '@/lib/format'
 import { Badge, ErrorText, PageHeader, Empty, Loading } from '@/components/ui'
@@ -10,6 +11,7 @@ const getPos = () => new Promise(r => (navigator.geolocation ? navigator.geoloca
 export default function Payments() {
   const { user } = useAuth(), [err, setErr] = useState(null), [note, setNote] = useState(null), canCreate = ['admin', 'project_manager'].includes(user.role)
   const { data, error, loading, reload } = useLoad(async () => { const m = await api('/milestones'); if (!canCreate) return { ...m, projects: [], contractors: [] }; const [p, c] = await Promise.all([api('/projects'), api('/contractors')]); return { ...m, projects: p.projects, contractors: c.contractors } })
+  usePolling(reload)
   const run = async fn => { try { setErr(null); await fn(); reload() } catch (x) { setErr(x.message) } }
   const act = (m, to, notes) => run(() => api(`/milestones/${m.id}/transition`, { method: 'POST', body: { to, notes } }))
   async function create(e) { e.preventDefault(); const form = e.currentTarget, f = Object.fromEntries(new FormData(form)); if (!f.dueDate) delete f.dueDate; await run(() => api('/milestones', { method: 'POST', body: f })); form.reset() }
