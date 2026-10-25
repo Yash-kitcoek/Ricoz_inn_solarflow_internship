@@ -3,4 +3,5 @@ node_modules
 .env
 .env.local
 uploads
+mongodb-data/
 .DS_Store

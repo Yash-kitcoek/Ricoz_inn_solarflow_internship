@@ -9,6 +9,8 @@ RUN npm ci --omit=dev
 # ── Build ─────────────────────────────────────────────────
 FROM base AS builder
 WORKDIR /app
+ARG BACKEND_URL=http://backend:4000
+ENV BACKEND_URL=${BACKEND_URL}
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .

@@ -2,11 +2,13 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import { useLoad } from '@/lib/hooks'
+import { usePolling } from '@/lib/usePolling'
 import { day } from '@/lib/format'
 import { ErrorText, PageHeader, Empty, Loading } from '@/components/ui'
 const STATUSES = ['Not Started', 'In Progress', 'Submitted', 'Approved', 'Rejected', 'Blocked']
 export default function Permits() {
   const { data, error, loading, reload } = useLoad(async () => { const [a, b] = await Promise.all([api('/permits'), api('/projects')]); return { items: a.items, projects: b.projects } }), [err, setErr] = useState(null)
+  usePolling(reload)
   async function add(e) { e.preventDefault(); const form = e.currentTarget, f = Object.fromEntries(new FormData(form)); if (!f.dueDate) delete f.dueDate; setErr(null)
     try { await api('/permits', { method: 'POST', body: f }); form.reset(); reload() } catch (x) { setErr(x.message) } }
   async function change(i, status) { let reason; if (status === 'Rejected' || status === 'Blocked') { reason = (prompt('Reason (required):') || '').trim(); if (!reason) return setErr(`A reason is required for ${status}.`) }

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-export const ROLES = ['admin', 'project_manager', 'engineer', 'contractor', 'finance']
+export const ROLES = ['admin', 'project_manager', 'engineer', 'contractor', 'finance', 'customer']
 const schema = new mongoose.Schema({ name: { type: String, required: true, trim: true, maxlength: 100 }, email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   passwordHash: { type: String, required: true, select: false }, role: { type: String, enum: ROLES, default: 'contractor' }, approved: { type: Boolean, default: false },
   contractor: { type: mongoose.Schema.Types.ObjectId, ref: 'Contractor', default: null } }, { timestamps: true })
